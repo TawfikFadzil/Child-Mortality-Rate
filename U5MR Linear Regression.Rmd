@@ -1,10 +1,7 @@
 ### Predicting Under 5 Mortality Rate (Linear Regression)
 
-library(knitr)
 library(glmnet)
-library (tree)
 library(car)
-library(MASS)
 
 # Read the data 
 wbcc <- read.csv("wbcc_bc.csv")
