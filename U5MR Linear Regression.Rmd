@@ -1,0 +1,71 @@
+### Predicting Under 5 Mortality Rate (Linear Regression)
+
+library(knitr)
+library(glmnet)
+library (tree)
+library(car)
+library(MASS)
+
+# Read the data 
+wbcc <- read.csv("wbcc_bc.csv")
+
+# Keeping Variables for analysis
+under5 <- wbcc[c(2,69:79)]
+names(under5) <- c("Country", "GenderParity", "Education", "Mortality", "HealthWorker", "Underweight", "Poverty", "PopulationGrowth", "Population", "UrbanGrowth", "UrbanPopulation", "UrbanPercentage")
+
+# Remove rows with missing values in under-five mortality rate
+under5 <- subset(under5, (!is.na(under5$Mortality)))
+
+# Subset without country
+u5mr <- under5[c(-1)]
+
+# Drop variables with high missing values 
+u5mr$HealthWorker <- NULL
+
+# Drop column with NA's
+u5mr <- na.omit(u5mr)
+
+#Fitting the linear model
+lm.u5mr <- lm(formula = Mortality~., data=u5mr)
+summary(lm.u5mr)
+
+# Plot Residual and Studentized Residual
+par(mfrow=c(1,2))
+plot(lm.u5mr, which=1) # Fitting the residual plots
+plot(lm.u5mr$fitted.values,studres(lm.u5mr)) #Fitting Studentized Residual Plot
+
+# Removing outliers
+r <- rstandard(lm.u5mr)  ## get standardised residuals
+order(abs(r), decreasing = TRUE)[1:3]
+u5mr2 <- u5mr[-c(93, 75, 58), ]
+
+#Fitting the linear model
+lm.u5mr2 <- lm(formula = Mortality~., data=u5mr2)
+summary(lm.u5mr2)$r.squared
+
+# Checking for Multicollinearity
+vif(lm.u5mr2)
+
+#Regularization method LASSO
+X <- model.matrix(lm.u5mr2)[,-1]
+Y <- u5mr2$Mortality
+
+lasso.u5mr2 <- glmnet(X,Y, alpha=1)
+plot(lasso.u5mr2, label=TRUE)
+
+#Cross Validation for LASSO
+cv_lasso.u5mr2 <- cv.glmnet(X,Y, alpha=1)
+plot(cv_lasso.u5mr2)
+
+#Lambda at tradeoff
+cv_lasso.u5mr2$lambda.1se
+
+#Fitting linear regression based on LASSO Variable Selections
+lm.lasso2.u5mr2 <- lm(formula = Mortality~GenderParity+Education+Underweight+Poverty+PopulationGrowth, data=u5mr2)
+summary(lm.lasso2.u5mr2)
+
+# Variance Inflation Factor
+vif(lm.lasso2.u5mr2)
+
+# Residual plot
+plot(lm.lasso2.u5mr2, which=1)
