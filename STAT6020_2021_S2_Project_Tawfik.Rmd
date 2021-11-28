@@ -1,0 +1,396 @@
+---
+title: A Comparative Study of Linear Regression and Decision Tree with Variables Selections
+  to Predict Child Mortality Rate
+author: "Mohamad Tawfik Ahmad Fadzil"
+date: "31/10/2021"
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  word_document: default
+papersize: a4
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(glmnet)
+library (tree)
+library(car)
+library(MASS)
+opts_chunk$set(echo = FALSE)
+```
+
+# Abstract
+
+Every year, millions of children age below 5 years old die globally. Fortunately, some of these deaths can be prevented. Reducing the mortality rate of these age groups is one the targets among the 17 Sustainable Development Goals by the United Nations. Thus, the purpose of this study is to develop a model that can predict under-five mortality rate based on other socioeconomic indicators. Linear Regression with Lasso regularization methods is used for automatic variable selections. Lasso methods have chosen two models, one with 7 predictor variables and another with 5 predictor variables. The best fitted model for linear regression is determined by adjusted R-squared, where the model with 5 predictor variables yield an adjusted R-squared value of 0.7809. The three models with different predictor variables are then compared with the models produced through Decision Tree by means of MSE. Hence, it has been revealed that Decision Tree has a better predictive ability than linear regression where all the MSE values are lower compared to linear regression. With linear regression model, a higher Gender Parity Index and Primary Completion Rate will result in lower child mortality rate. However, higher Poverty, Prevalence of Underweight and Population causes the mortality rate to increase. On the other hand, Decision Tree Model indicated that Poverty is the most important factor contributing to mortality rate. In order to achieve the target set by United Nation which is to have child mortality rate below 25 per 1000 live births, the poverty headcount ratio needs to be below 5.7 followed by prevalence of underweight less than 16.25%.  
+
+
+# Introduction
+
+Child mortality rate is a leading indicator for health in children and by extension a measure of the country’s health system (Wheatley, 2015). Child mortality, or the under-five mortality rate, can be defined as the rate of a child dying between birth and exactly 5 years of age, expressed per 1000 live births. In 2019, World Health Organization (2020) claimed that under-five mortality rate is the highest compared to mortality rate from children under different age groups. As such, it has been revealed that an estimation of 5.2 million causes of death under 5 years children could have been treated and prevented. For this reason, the United Nations have incorporated this indicator among the 17 Sustainable Development Goals. The aim is to reduce the under-five mortality rate to at least 25 per 1000 live births in every country by 2030 (United Nations, 2020). 
+
+Substantial global progress has been made in the last century to reduce the child mortality rate. According to World Health Organization (2020), the total number of under-five mortality rate has reduced by 59% globally since 1990. The world as a whole has been doing well in reducing the child mortality rate. However, the numbers are still alarmingly high especially in low-income or developing countries (Wheatley, 2015). 
+
+There are many factors that can contribute to a child mortality rate. Fundamentally, Franz and FitzRoy (2006) had investigated the relationships of socioeconomic factors to child mortality rate. They argued that socioeconomic issues played a big impact in the child mortality rate, although the study is focused on Republic Asian Countries. Therefore, this study will also look into the relationship between socioeconomic factors and under-five mortality rate but with worldwide focus. 
+
+Regression analysis is applied to determine the significance of the socioeconomic factors on the under-five mortality rate. The main focus of this project is to analyze and compare the performance of linear regression and decision tree in predicting the under-five mortality rate. Accordingly, the study will be done across 120 countries to study the global relation between socioeconomic factors and the mortality rate. The findings can then be used to suggest areas for policy makers to consider when seeking options for combating child mortality in order to bring higher level of socioeconomic development.
+
+# Data
+
+## Data Description
+
+```{r include=FALSE}
+# Read the data 
+wbcc <- read.csv("wbcc_bc.csv")
+
+# Keeping Variables for analysis
+under5 <- wbcc[c(2,69:79)]
+names(under5) <- c("Country", "GenderParity", "Education", "Mortality", "HealthWorker", "Underweight", "Poverty", "PopulationGrowth", "Population", "UrbanGrowth", "UrbanPopulation", "UrbanPercentage")
+
+# Remove rows with missing values in under-five mortality rate
+under5 <- subset(under5, (!is.na(under5$Mortality)))
+
+# Subset without country
+u5mr <- under5[c(-1)]
+
+```
+
+Dataset for this project was obtained and extracted from the World Bank Database. The World Bank Group (2021) is a global partnership compromising five related institutions running for viable answers that lessen poverty and produce share prosperity in developing countries. This dataset contains records of World Development Indicators collection of most of the countries in the world. In this study, the under-five mortality rate, 'Mortality' is used as the dependent variable. 
+
+The analysis is carried out through R software. For each country, there are 10 independent variables, which have been renamed in R, and of primary interest:
+
+* **GenderParity**: Gender parity index for gross enrollment ratio in primary and secondary education.
+* **Education**: Primary completion rate, or gross intake ratio to the last grade of primary education. 
+* **HealthWorker**: Community health workers measured per 1,000 people.
+* **Underweight**: Percentage of children under age 5 whose weight for age is more than two standard deviations below the median.
+* **Poverty**: Percentage of the population living on less than $1.90 a day at 2011 international prices. 
+* **PopulationGrowth**: Annual population growth rate, expressed as a percentage.
+* **Population**: Total population which counts all residents regardless of legal status or citizenship
+* **UrbanGrowth**: Annual urban population growth rate, expressed as a percentage.
+* **UrbanPopulation**: Total population of people living in urban areas.
+* **UrbanPercentage**: Percentage of urban population from the total population.
+
+## Data Cleaning and Pre-Processing
+
+Descriptive statistics was carried out to observe for any missing values contained in the datasets.
+
+```{r echo=TRUE}
+
+summary(u5mr)
+
+```
+HealthWorker variable consisted of a high number missing values, accounting for 68.9% of the total number of observations. Hence, this variable is removed from the analysis. The remaining observations that contained missing values from other independent variables (GenderParity, Education, Underweight and Poverty) are removed. Therefore, the final datasets to be carried out with the analysis incorporated 9 independent variables with 120 observations.  
+
+```{r include=FALSE}
+# Drop variables with high missing values 
+u5mr$HealthWorker <- NULL
+  
+# Drop column with NA's
+u5mr <- na.omit(u5mr)
+
+```
+
+# Methods
+
+Linear Regression and Decision Tree are carried out to compare the performance of the models to predict the under-five mortality rate. With Linear Regression, R-squared and adjusted R-squared are used as an indicator to choose the best fitted model. Then, the Linear Regression models and Decision Trees models are compared based on the Mean Squared Error (MSE) to determine which model has a better performance in predicting under-five mortality rate.
+
+
+## Linear Regression
+
+Linear regression is one of the most prevalent techniques used in predictive modelling. It is employed to examine the relationship between the dependent variable and one or more independent variables. Since there are 9 independent variables used, the linear regression is also called as multiple regression.  
+
+The mathematical concept of multiple linear regression can be expressed as:
+$$ Y = \beta_0 + \beta_1 X_1 + \ldots + \beta_p X_p$$
+Where $Y$ is the dependent variable, $X$ are the independent variables, $\beta$ are the coefficients of independent variables and $\beta_0$ is the intercept. 
+
+There are some key statistical assumptions for linear regressions:
+
+* Linearity between response-predictor relationships.
+* The error terms have constant variance.
+* There is no multicollinearity in the model.
+
+The first step is to run the full linear regression. The resulting output is shown.
+
+```{r echo=TRUE}
+#Fitting the linear model
+lm.u5mr <- lm(formula = Mortality~., data=u5mr)
+summary(lm.u5mr)
+```
+Based on the initial fitted model, only GenderParity, Education, Underweight and Poverty are statisically significant while the other independent variables are not significantly significant at 5% significance level. The first run model has an R-squared of 0.7235.
+
+### Outliers
+An outlier is a point that is far from the value predicted by the model. There are many reasons of outliers. Extreme outliers can have sizeable impact on the estimated regression line. Thus, residual plot can be adopted to identify this outlier. A studentized residual plot is also plotted to determine whether the potential outlier is large enough to be considered as outliers. Both the residual plot and studentized residuals plot are shown in Figure 1. 
+
+```{r fig.cap="Residual plot (Left Figure) and Studentized Residual Plot (Right Figure)"}
+par(mfrow=c(1,2))
+plot(lm.u5mr, which=1) # Fitting the residual plots
+plot(lm.u5mr$fitted.values,studres(lm.u5mr)) #Fitting Studentized Residual Plot
+```
+
+According to Figure 1, it has been observed that the observations 115, 143 and 173 are visible as potential outliers. In a studentized residual plots, observations that exceed than 3 in absolute values can be determined as outliers (James,Witten, Hastie, & Tibshirani, 2013). The studentized residual plots portrayed that the three observations are above 3. For that reason, it is considered as outlier and remove from the model before fitting in a new linear regression model. 
+
+```{r include=FALSE}
+# Removing outliers
+r <- rstandard(lm.u5mr)  ## get standardised residuals
+order(abs(r), decreasing = TRUE)[1:3]
+u5mr2 <- u5mr[-c(93, 75, 58), ]
+```
+ 
+```{r echo=TRUE}
+#Fitting the linear model
+lm.u5mr2 <- lm(formula = Mortality~., data=u5mr2)
+summary(lm.u5mr2)$r.squared
+``` 
+Both models are compared based on the R-squared values. R-squared value is a goodness-of-fit measure for linear regression. The statistics indicated the percentage of response variable variation that is explained by a linear model. The higher the R-squared value, the better fit the model and the better its ability to explain the variability in the observed data.
+
+After removing the three observations, the model R-squared value has increased from 0.7235 to 0.7918. Therefore, the model with the removed observations fits the data better. 
+
+### Multicollinearity
+Linear regression assume that there is no multicollinearity exists within the model. Collinearity exists when there are two or more predictor variables that are closely related to one another. Multicollinearity, if left untouched, can have a detrimental impact on the generalizability and accuracy of the model. Thence, Variance Inflation Factor (VIF) is used to determine multicollinearity within a fitted model (Schreiber-Gregory, 2018)
+
+```{r}
+vif(lm.u5mr2)
+```
+As a rule of thumb, a VIF value that exceeeds 5 indicates a problematic amount of collinearity (James et al., 2013). In this case, PopulationGrowth, Population, UrbanGrowth and UrbanPopulation contained a very high VIF value. So this indicates that multicollinearity exists within the model. Therefore, regularization technique such as LASSO is able to deal with the multicollinearity within the model.  
+
+### Lasso Regression and Model Selections
+
+Regularization techniques such as Ridge and Lasso are use to help generalize models with highly complex relationships such as multicollinearity. The regularization adds a penalty components to constraint the model coefficients, such that the variability of the model coefficients is limited or discouraged.  
+
+Unlike Ridge, Lasso tends to shrink coefficients to be completely shrunk to zero if it goes below by a certain amount. As such, Lasso not only performs regularization but also variable selection. This resulting to a simpler and more interpretable model than Ridge. The Lasso is done run through a cross validation to see the regularization performed at various lambda value. Figure 2 demonstrates cross validated mean that is run through Lasso. 
+
+```{r include=FALSE}
+#Regularization method LASSO
+X <- model.matrix(lm.u5mr2)[,-1]
+Y <- u5mr2$Mortality
+
+lasso.u5mr2 <- glmnet(X,Y, alpha=1)
+plot(lasso.u5mr2, label=TRUE)
+```
+
+```{r echo=FALSE, fig.cap= "Cross Validation for Lasso"}
+#Cross Validation for LASSO
+cv_lasso.u5mr2 <- cv.glmnet(X,Y, alpha=1)
+plot(cv_lasso.u5mr2)
+```
+
+As illustrated in Figure 2, the red dots represent the test Mean Squared Error (MSE) for the corresponding model running through different lambda value as estimated by cross validation. The left dotted vertical line indicates the model with the minimum MSE value (lambda = 0.78). The rightmost vertical line indicated the largest value of lambda for which the MSE is not above one standard error from the minimum (lambda = 4.16). This is the default choice as the model exhibiting a good-tradeoff between performance and regularization. 
+
+```{r include=FALSE}
+#Best Lambda
+cv_lasso.u5mr2$lambda.min
+
+#Lambda at tradeoff
+cv_lasso.u5mr2$lambda.1se
+
+```
+
+The model at left dotted vertical line chose 7 variables while the model at right dotted vertical line chose5 variables. The coefficients summary at these two points can be found in the Appendix A. Both models have chosen GenderParity, Education, Underweight, Poverty and PopulationGrowth. Meanwhile, the the minimum MSE model has selected an additional of two independent variables which are population and urban population. The summary output of running the linear regression with 7 predictor variables results is shown in Appendix B.
+
+*Adjusted R-squared* 
+```{r}
+#Fitting linear regression based on LASSO variable selections
+lm.lasso.u5mr2 <- lm(formula = Mortality~GenderParity+Education+Underweight+Poverty+PopulationGrowth+Population+UrbanPopulation, data=u5mr2)
+summary(lm.lasso.u5mr2)$adj.r.squared
+```
+
+The R-squared measures are not suitable to be measured for this model (7 variables) and previous model (9 variables) as they have different number of predictors. R squared can always be increased by adding additional predictors. From here, adjusted R-squared would be a more appropriate measure to compare between these models. Hence, it can be seen that the adjusted R-squared has slightly increased from 0.7743 to 0.7784 as compared to previous full model which suggest that the choosing 7 variables have improve the model. 
+
+VIF is also run to check for multicollinearity with the model.
+
+```{r}
+# Variance Inflation Factor
+vif(lm.lasso.u5mr2)
+```
+It is exhibited that Urban Population and Population still have very high VIF value. This portrays that high multicollinearity still exists within the model. Note that the UrbanPopulation and Population is not included in the model selection, where lambda at tradeoff value. Running the linear regression with 5 independent variables result in following model.
+
+*Model at Tradeoff value*
+```{r}
+
+#Fitting linear regression based on LASSO variable selections
+lm.lasso2.u5mr2 <- lm(formula = Mortality~GenderParity+Education+Underweight+Poverty+PopulationGrowth, data=u5mr2)
+summary(lm.lasso2.u5mr2)
+
+```
+Based on the summary, the adjusted R-squared has improved with 5 independent variables, where the adjusted R-squared has increase from 0.7784 to 0.7809. This displays that choosing 5 independent variables has improved the fit of the model. All the 5 independent variables are statistically significant at 5% significance level which indicate strong association with the dependent variables. 
+
+```{r}
+# Variance Inflation Factor
+vif(lm.lasso2.u5mr2)
+```
+
+Based on the VIF, it can be observed that all predictor variables have low VIF value. This displays that there is not much collinearity exists between them. 
+
+Residual plot for the linear regression with 5 predictor variables are shown in Figure 3.
+
+```{r fig.cap="Residual", fig.height=4, fig.width=5}
+plot(lm.lasso2.u5mr2, which=1)
+```
+
+Plotting a residual plot (Figure 3) presents that there is no discernible pattern or trend which suggest the linearity between independent variables and dependent variables. Also, it can be observed that the distribution of the variance are approximately constant. 
+
+Thus, the model with these 5 independent variables are chosen as the final model to fit the linear regression. 
+
+## Decision Tree
+Decision Tree is a non-parametric method which has capability to efficiently segment population into meaningful subgroups. The decision tree is a very effective method for understanding the behavior of various variables. non-linear and linear problems. It is also a popular technique because it is easy interpretation and has a nice graphical representation (James et al., 2013). 
+
+Benefit of using Decision Tree:
+* Robust to outliers
+* Handle multicollinearity well.
+* Can handle both linear and non-linear problems.
+
+Tree splitting is based on choosing the cut-point such that the resulting tree has the lowest Residual Sum of Squares (RSS). The process continues until the terminal nodes are too small or too few to be split.
+
+The tree is established based on the dataset of under-five mortality rate including the three observations that was removed from the linear regression. To compare the Decision Tree with the Linear Model, 3 Decision Tree models are run with different number of variables (9, 7 and 5 variables). Note that 7 and 5 independent variables are depend on the coefficients selected by Lasso. 
+
+
+```{r echo=TRUE}
+# Building regression Tree with 9 Variables
+tree.u5mr <- tree(formula = Mortality~., data=u5mr)
+
+# Building regression Tree with 7 variables
+tree2.u5mr <- tree(formula = Mortality~GenderParity+Education+Underweight+Poverty                   +PopulationGrowth+Population
+                   +UrbanPopulation, data=u5mr )
+
+# Building regression Tree with 5 variables
+tree3.u5mr <- tree(formula = Mortality~GenderParity+Education+Underweight+Poverty
+                   +PopulationGrowth, data=u5mr)
+
+````
+
+The resulting tree plot for 9 variables is shown and discussed in the Results and Discussions sections.
+
+# Results and Discussions
+The following results are obtained after fitting linear regression considering under-five mortality rate, 'Mortality', as the dependent variables. Table 1 represents the comparison of linear regression with full model and with models of which the variables been selected by LASSO regression.
+
+```{r}
+# Get r2 value
+r2.lm1 <- summary(lm.u5mr2)$r.squared
+r2.lm2 <- summary(lm.lasso.u5mr2)$r.squared
+r2.lm3 <- summary(lm.lasso2.u5mr2)$r.squared
+
+# Get adjusted r2 value
+adjr2.lm1 <- summary(lm.u5mr)$adj.r.squared
+adjr2.lm2 <- summary(lm.lasso.u5mr2)$adj.r.squared
+adjr2.lm3 <- summary(lm.lasso2.u5mr2)$adj.r.squared
+
+# Producing Table
+name.lm <- c("9 Variables", "7 Variables", "5 Variables")
+r2.lm<- round(c(r2.lm1, r2.lm2, r2.lm3), digits = 4)
+adjr2.lm <- round(c(adjr2.lm1,adjr2.lm2,adjr2.lm3),digits=4)
+
+lmresult <- data.frame(name.lm, r2.lm, adjr2.lm)
+
+kable(lmresult, col.name=c("Model", "R-squared", "Adjusted R-squared" ), align = c("l","c","c"), caption = "Summary Result of Linear Model", full.width = F)
+
+```
+
+The final model of the linear regression are chosen based on the highest adjusted R-squared value (Table 1) and can be expressed as:
+
+$Mortality = 116.71 - 77.77GenderParity - 0.32Education +0.65Underweight + 0.27Poverty + 6.39PopulationGrowth$
+
+There are five predictor variables that explained impact of child mortality rate. Gender Parity Index (GPI) is a measure of relative access to education of males and females. An increase of GPI implies that there is a higher access to education for female. Hence, this is seen to have positive impact which would decrease the mortality rate. 
+
+Likewise, 'Education' which is defined as the primary completion rate indicate the percentage of students completing their last year of primary school. The number of primary completion rate has a positive impact in lowering the child mortality rate. For this reason, access for education for female as well as completing the studies are good in lowering down the child mortality rate. 
+
+Furthermore, 'Underweight', 'Poverty', and 'PopulationGrowth' have seen to generate the increment of mortality rate. The prevalence of underweight displayed the percentages of children who is underweight. This is commonly due to malnutrition. As a result, children who does not have access to adequate nutrition can result in more death for the children.
+
+Poverty is defined by the percentage of population who earns at below $ 1.90 a day at international prices. Increase in 'Poverty' has shown to heighten the child mortality rate. The population growth of a country will also develop in higher child mortality rate. This might be due to lower resources to accomodate for higher demands. 
+
+Increasing in the level of education, which is measured by the completion rate, will help to lessen the mortality rate. Underweight, Poverty and Population Growth are shown to have positive relationship with increasing mortality rate. Issues to tackle on these issues help to lower down the mortality rate.
+
+To compare and visualize the result of a Decision Tree model, the model will be plotted with 9 variables as shown in Figure 4.
+
+```{r, Decision Tree with 9 variables}
+plot(tree.u5mr)
+text(tree.u5mr, cex=0.4)
+```
+The decision tree (Figure 4) demontsrates that it has selected 6 predictor variables, 5 of which are similar to the linear model with an addition of 'UrbanPopulation' as the 6th predictor variables. It has been discovered that UrbanPopulation gives a more accurate predictor to predict the mortality rate when the Poverty Headcount Ratio is more than 5.7, Gender Parity Index is above 0.936, Primary Completion Rate below 86.21 and Prevalence of Underweight is less than 12.95%. 
+
+Fundamentally, the Decision Tree signifies that Poverty headcount Ratio is the most important factor to determine the mortality rate. A lower Poverty, where the poverty is lower than 5.7, will cause in lower child mortality rate. THis is with estimated to be between 6.2 to 34 deaths per 1000 live births. Therefore, countries who has a Poverty head-count ratio of lower than 5.7, followed by less than 16.25% prevalence underweight chidlren can achieve the goal stated by the United Nation. This relates to achieving a under-five mortality rate of 25 deaths per 1000 live birhts.  
+
+In order to see the performance of Decision Tree and Linear Model, the three models (9, 7 and 5 variables) of each technique are compared through the mean squared error (MSE) as shown in Table 2. MSE measure the average squared difference between the estimated values and what is estimated. 
+
+\newpage
+
+```{r}
+# Get MSE for linear model
+lm1.mse <- mean(residuals(lm.u5mr2)^2)
+lm2.mse <- mean(residuals(lm.lasso.u5mr2)^2)
+lm3.mse <- mean(residuals(lm.lasso2.u5mr2)^2)
+
+# Get MSE for Decision Tree
+mse.full <- mean(residuals(tree.u5mr)^2)
+mse.7var <- mean(residuals(tree2.u5mr)^2)
+mse.5var <- mean(residuals(tree3.u5mr)^2)
+
+# Producing Table
+name.lm <- c("9 Variables", "7 Variables", "5 Variables")
+lm.mse <- round(c(lm1.mse,lm2.mse,lm3.mse), digits = 2)
+dt.mse <- round(c(mse.full, mse.7var, mse.5var),digits=2)
+
+mseresult <- data.frame(name.lm, lm.mse, dt.mse)
+
+kable(mseresult, col.name=c("Model", "Linear Model", "Decision Tree" ), align = c("l","c","c"), caption = "Comparison of MSE between Linear Regression and Decision Tree", full.width = F)
+```
+
+According to Table 2, all MSE values using decision tree are less than the linear regression. In respect to that, Decision Tree are better predictive technique compared to linear regression in predicting child mortality rate. 
+
+Comparing within linear regression models, it can be seen that using the final selection model (5 variables) does not differ much in terms of the MSE value. This is because Lasso has addressed the multicollinearity issue, as well as choosing a predictor variable that has lower variance with introduction of a little bias. It is subsequently producing simpler model while not compromising much of the accuracy. Therefore,the relationship between the predictor variables and the response is well approximated by this linear model.
+
+On the other hand, Decision Tree are employed based on the selection done by Lasso (5 predictor variables) on the linear model. This seems to have higher increase of MSE when predictors are chosen. Unfortunately, trees can be very non-robust. For this reason, a small change in the data can cause a large change in the final estimated tree. However, this can be overcome with the use of bagging, random forests and boosting to aggregate many decisions true resulting in much powerful predictions model.
+
+# Conclusions
+In summary, the study has successfully compare the use of linear regression and Decision Tree to predict the under-five mortality rate. Prediction of Decision Tree with 9, 7 and 5 predictor variables all have lower MSE values compared to linear regression. It can be concluded that Decision Tree is more accurate in predictive modeling compared to linear regression in predicting the under five mortality rate. 
+
+The final linear regression model has summarized that factors of Gender Parity Index, Primary Completion Rate, Prevalence of Underweight, Poverty, and Population Growth indicator have significant impact on the child mortality rate. It can be exhibited that having completing schools as well as having access for female to education help to reduce the mortality rate. Also, issues such as malnutrition, poverty and population growth needs to be addressed because increasing of these factors impacted to the increasing mortality rate. The adjusted R-squared for this model is found to be at 0.7809. The Lasso regression not only in assists in getting a simpler model but also not compromise the accuracy of the predictive model. 
+
+Contrarily, Decision Tree has chosen a total of 6 predictor variables, 5 predictor variables similar to the one linear regression model but with one additional variables, which is the Urban Population. It can be determined that Poverty is the most important variable in determining the child mortality rate. In order to achieve the goal of having 25 deaths per 1000 variables, Poverty headcount ratio needs to be below than 5.7 followed by prevalence of underweight being below than 16.25%.
+
+
+\newpage
+
+# References
+
+Franz, J. S., & FitzRoy, F. (2006). Child mortality and environment in developing countries. *Population and environment*, 27(3), 263-284.
+
+James, G., Witten, D., Hastie, T., & Tibshirani, R. (2013). *An introduction to statistical learning* (Vol. 112, p. 18). New York: springer 
+
+Schreiber-Gregory, D.N. & Jackson, H.M (2018). Multicollinearity: What is it and what can we do about it? *PharmaSUG*. [Retrieved from https://www.pharmasug.org/proceedings/2018/AA/PharmaSUG-2018-AA01.pdf
+
+United Nations (2020). Sustainable Development. *Department of Economic and Social Affairs*. Retrieved from https://sdgs.un.org/goals/goal3] (https://sdgs.un.org/goals/goal3
+
+Wheatley, L. (2015). Factors affecting child mortality. *Honors Theses*. Retrieved from https://scholar.utc.edu/honors-theses/39
+
+World Health Organization (2020). Children: Improving survival and well-being [Factsheet]. Retrieved from https://www.who.int/news-room/fact-sheets/detail/children-reducing-mortality
+
+
+\newpage
+
+# Appendices
+
+## Appendix A
+
+**Lambda coefficients when lambda at minimum MSE value**
+```{r}
+# Find coefficients of lambda best model
+coef(cv_lasso.u5mr2, s=cv_lasso.u5mr2$lambda.min)
+```
+
+**Lasso Coefficients when Lambda at tradeoff**
+```{r}
+#Find coefficients of lambda at tradeoff value
+coef(cv_lasso.u5mr2, s=cv_lasso.u5mr2$lambda.1se)
+```
+
+\newpage
+
+## Appendix B
+
+```{r}
+# Summary output of linear model with 7 predictor variables
+summary(lm.lasso.u5mr2)
+```
+
+
